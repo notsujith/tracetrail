@@ -22,8 +22,7 @@ Rules:
   {"agents": ["log_detective", "metrics_analyst", "trace_walker"]}
 - Use only names from the menu above. Invent nothing."""
 
-_agent = create_agent(model=make_llm,
-                      json_mode=True,
+_agent = create_agent(model=make_llm(json_mode=True),
                       system_prompt=TRIAGE_PROMPT)
 
 VALID_SPECIALISTS = ["log_detective", "metrics_analyst", "trace_walker"]

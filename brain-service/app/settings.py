@@ -7,5 +7,6 @@ class Settings(BaseSettings):
     tenant_api_key: str
     OLLAMA_EMBEDDINGS_MODEL: str = "nomic-embed-text:latest"
     OLLAMA_CHAT_MODEL: str = "qwen2.5:3b"
+    ollama_base_url: str = "http://localhost:11434"
 
 setting = Settings()

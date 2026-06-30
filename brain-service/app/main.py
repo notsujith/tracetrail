@@ -1,5 +1,4 @@
-from fastapi import FastAPI
-from langgraph_sdk.auth.exceptions import HTTPException
+from fastapi import FastAPI, HTTPException
 
 from app.graph.build import graph
 from app.request import InvestigationRequest

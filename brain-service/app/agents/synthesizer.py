@@ -27,8 +27,7 @@ Return ONLY a JSON object. No prose before or after. No markdown fences. Exactly
     {"claim": "<a claim from your hypothesis>", "source": "<agent name whose finding supports it>"}
   ]
 }"""
-_agent = create_agent(model=make_llm,
-                      json_mode=True,
+_agent = create_agent(model=make_llm(json_mode=True),
                       system_prompt=SYNTHESIZER_PROMPT)
 
 def _synth_user_msg(state:InvestigationState) -> str:
