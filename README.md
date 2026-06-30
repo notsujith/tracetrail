@@ -130,16 +130,6 @@ docs/                 architecture blueprints & implementation references
 - [`docs/phase-3-blueprint.md`](docs/phase-3-blueprint.md) — Brain Service design
 
 ---
-
-## Roadmap
-
-- [x] Phase 1 — ingestion, storage, query API, React frontend
-- [x] Phase 3 — LangGraph Brain Service
-- [ ] Kafka ingestion buffer
-- [ ] RAGAS / DeepEval evaluation harness
-- [ ] Change Correlator agent
-- [ ] Langfuse AI-observability integration
-
 ---
 
 ## License
