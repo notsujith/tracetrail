@@ -1,0 +1,158 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: tt-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./db-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: tt-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  ingestion:
+    build: ./ingestion-service
+    container_name: tt-ingestion
+    ports:
+      - "4318:4318"
+      - "8081:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/tracetrail
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  query:
+    build: ./query-service
+    container_name: tt-query
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/tracetrail
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  cart-service:
+    build: ./demo-app/cart-service
+    container_name: tt-demo-cart
+    ports:
+      - "9001:8080"
+    environment:
+      OTEL_SERVICE_NAME: cart-service
+      INVENTORY_URL: http://inventory-service:8080
+      PAYMENT_URL: http://payment-service:8080
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+    depends_on:
+      otel-collector:
+        condition: service_started
+
+  inventory-service:
+    build: ./demo-app/inventory-service
+    container_name: tt-demo-inv
+    ports:
+      - "9002:8080"
+    environment:
+      OTEL_SERVICE_NAME: inventory-service
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+    depends_on:
+      otel-collector:
+        condition: service_started
+
+  payment-service:
+    build: ./demo-app/payment-service
+    container_name: tt-demo-pay
+    ports:
+      - "9003:8080"
+    environment:
+      OTEL_SERVICE_NAME: payment-service
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+    depends_on:
+      otel-collector:
+        condition: service_started
+
+  frontend:
+    build: ./frontend
+    container_name: tt-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      query:
+        condition: service_started
+
+  otel-collector:
+    image: otel/opentelemetry-collector:0.116.1
+    container_name: tt-otel-collector
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol/config.yaml
+    environment:
+      DEMO_TENANT_KEY: ${DEMO_TENANT_KEY}
+    depends_on:
+      ingestion:
+        condition: service_started
+  brain-service:
+    build: ./brain-service
+    ports:
+      - "8090:8090"
+    environment:
+      QUERY_SERVICE_URL: http://query-service:8080
+      TENANT_API_KEY: ${TENANT_API_KEY}
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL:-qwen2.5:3b}
+      OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-nomic-embed-text}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      query-service:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8090/health" ]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+volumes:
+  mysql-data:

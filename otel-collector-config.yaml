@@ -1,0 +1,21 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+exporters:
+  otlphttp/tracetrail:
+    endpoint: http://ingestion:4318 # exporter auto-appends /v1/traces
+    encoding: json # protobuf in -> JSON out (what ingestion parses)
+    compression: none # ingestion reads raw JSON; gzip default = 400 "code 31" (0x1F gzip magic)
+    headers:
+      X-Tenant-API-Key: ${env:DEMO_TENANT_KEY}
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [otlphttp/tracetrail]
