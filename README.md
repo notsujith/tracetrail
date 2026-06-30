@@ -130,7 +130,6 @@ docs/                 architecture blueprints & implementation references
 - [`docs/phase-3-blueprint.md`](docs/phase-3-blueprint.md) — Brain Service design
 
 ---
----
 
 ## License
 
