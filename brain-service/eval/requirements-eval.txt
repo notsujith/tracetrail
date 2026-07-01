@@ -1,0 +1,6 @@
+ragas>=0.2.10,<0.3
+deepeval>=2.0,<4
+datasets>=2.19
+pandas>=2.0
+langchain-ollama>=0.2
+langchain-core>=0.3
