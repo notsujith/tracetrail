@@ -1,5 +1,6 @@
 package com.tracetrail.ingestion.controller.otlp;
 
+import com.tracetrail.ingestion.buffer.SpanSink;
 import com.tracetrail.ingestion.parser.otlp.OtlpParser;
 import com.tracetrail.ingestion.parser.records.logs.OtlpLogsRequest;
 import com.tracetrail.ingestion.parser.records.metrics.OtlpMetricsRequest;
@@ -9,8 +10,6 @@ import com.tracetrail.ingestion.parser.records.parsed.ParsedTraces;
 import com.tracetrail.ingestion.parser.records.traces.OtlpTracesRequest;
 import com.tracetrail.ingestion.persistence.models.LogRecord;
 import com.tracetrail.ingestion.persistence.models.MetricPoint;
-import com.tracetrail.ingestion.persistence.models.Span;
-import com.tracetrail.ingestion.persistence.models.Tenant;
 import com.tracetrail.ingestion.persistence.repos.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -22,43 +21,36 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.tracetrail.ingestion.persistence.models.Tenant;
+
 import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
 @RequiredArgsConstructor
-public class  OtlpController {
+public class OtlpController {
 
     private final OtlpParser parser;
-    private final SpanRepository spanRepo;
+    private final SpanSink spanSink;
     private final MetricRepository metricRepo;
     private final LogRecordRepository logRecordRepo;
     private final ServiceRepository serviceRepo;
-    private final TenantRepository tenantRepository;
 
     @PostMapping(value = "/v1/traces", consumes = "application/json")
     public ResponseEntity<?> ingestTraces(
             @RequestBody @Valid OtlpTracesRequest body,
             HttpServletRequest req,
             HttpServletResponse res
-
     ) {
         Tenant tenant = (Tenant) req.getAttribute("tenant");
         ParsedTraces parsedTraces = parser.parseTraces(body, tenant.getId());
         try {
-            spanRepo.saveAll(parsedTraces.spans());
-        } catch (DataAccessException e){
+            spanSink.accept(tenant.getId(), parsedTraces.spans());
+        } catch (DataAccessException e) {
             return ResponseEntity.status(503).body(
                     Map.of("error", "database unreachable"));
         }
 
-        parsedTraces.spans()
-                .stream()
-                .map(Span::getServiceName)
-                .collect(Collectors.toSet())
-                .forEach(serviceName ->
-                        serviceRepo.upsert(tenant.getId(),
-                                serviceName));
         var returnBody = Map.of("partialSuccess",
                 Map.of("rejectedSpans", parsedTraces.rejected(),
                         "error message", parsedTraces.errorMessage())
@@ -73,7 +65,7 @@ public class  OtlpController {
             @RequestBody @Valid OtlpMetricsRequest body,
             HttpServletRequest req,
             HttpServletResponse res
-            ) {
+    ) {
 
         Tenant tenant = (Tenant) req.getAttribute("tenant");
         ParsedMetricPoints parsedMetrics = parser
@@ -81,7 +73,7 @@ public class  OtlpController {
 
         try {
             metricRepo.saveAll(parsedMetrics.points());
-        } catch (DataAccessException e){
+        } catch (DataAccessException e) {
             return ResponseEntity.status(503).body(
                     Map.of("error", "database unreachable"));
         }
@@ -109,7 +101,7 @@ public class  OtlpController {
             @RequestBody @Valid OtlpLogsRequest body,
             HttpServletRequest req,
             HttpServletResponse res
-            ) {
+    ) {
 
         Tenant tenant = (Tenant) req.getAttribute("tenant");
         ParsedLogRecords parsedLogRecords = parser
@@ -117,7 +109,7 @@ public class  OtlpController {
 
         try {
             logRecordRepo.saveAll(parsedLogRecords.records());
-        } catch (DataAccessException e){
+        } catch (DataAccessException e) {
             return ResponseEntity.status(503).body(
                     Map.of("error", "database unreachable"));
         }
